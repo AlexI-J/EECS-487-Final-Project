@@ -2,7 +2,7 @@ from typing import List
 import torch
 from torch.utils.data import Dataset
 
-class NewsQADataset(Dataset):
+class NewsDataset(Dataset):
     """Dataset for simplified QA task on NewsQA"""
 
     def __init__(self, data: List[dict]):
