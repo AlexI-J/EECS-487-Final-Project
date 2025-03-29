@@ -1,15 +1,29 @@
 import pandas as pd
 from tqdm import tqdm
 import os
-from datetime import datetime
 import matplotlib.pyplot as plt
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
+import re
 import string
+from concurrent.futures import ProcessPoolExecutor
 
+# Download necessary resources
 nltk.download('punkt')
 nltk.download('stopwords')
+
+# Define these globally
+stop_words = set(stopwords.words('english'))
+punctuation_set = set(string.punctuation)
+executor = ProcessPoolExecutor()
+
+def clean_tokens(text):
+    tokens = re.findall(r"\b\w+\b", text.lower())
+    return ' '.join([word for word in tokens if word not in stop_words])
+
+def clean_column(texts):
+    return list(executor.map(clean_tokens, texts))
 
 def read_stocks():
     if os.path.exists("stocks.csv"):
@@ -83,27 +97,23 @@ def vis_stocks():
 def read_articles():
     input_file = "all-the-news-2-1.csv"
     output_file = "all-the-news-2-1-processed.csv"
-    chunksize = 100_000
+    chunksize = 10_000
     cols_to_remove = ['year', 'month', 'day', 'author', 'url']
 
     total_lines = 2_688_878
     total_chunks = total_lines // chunksize + 1
 
-    stop_words = set(stopwords.words('english'))
-    punctuation_set = set(string.punctuation)
-
-    def clean_tokens(text):
-        tokens = word_tokenize(text)
-        return [word for word in tokens if word.lower() not in stop_words and word not in punctuation_set]
-
     with pd.read_csv(input_file, chunksize=chunksize) as reader:
-        for i, chunk in enumerate(tqdm(reader, total=total_chunks, desc="Processing article data")):
-            chunk = chunk.drop(columns=cols_to_remove, errors='ignore')
+        for i, chunk in enumerate(tqdm(reader, total=total_chunks)):
+            chunk.drop(columns=cols_to_remove, errors='ignore', inplace=True)
 
-            if 'title' in chunk.columns:
-                chunk['title'] = chunk['title'].fillna("").apply(clean_tokens)
-            if 'article' in chunk.columns:
-                chunk['article'] = chunk['article'].fillna("").apply(clean_tokens)
+            if 'title' in chunk:
+                chunk['title'] = chunk['title'].fillna("").astype(str)
+                chunk['title'] = clean_column(chunk['title'].values)
+
+            if 'article' in chunk:
+                chunk['article'] = chunk['article'].fillna("").astype(str)
+                chunk['article'] = clean_column(chunk['article'].values)
 
             mode = 'w' if i == 0 else 'a'
             header = i == 0
