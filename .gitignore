@@ -1,2 +1,14 @@
 all-the-news.csv
+all-the-news-2-1.csv
+all-the-news-2-1-processed.csv
+stocks.csv
+glove.6B.100d.txt
 /.venv
+/env
+/__pycache__
+/stocks
+Energy_stocks.png
+Financial_stocks.png
+Healthcare_stocks.png
+Industrial_stocks.png
+Technology_stocks.png

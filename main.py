@@ -8,6 +8,7 @@ from nltk.corpus import stopwords
 import re
 import string
 from concurrent.futures import ProcessPoolExecutor
+from model import run_model
 
 # Download necessary resources
 nltk.download('punkt')
@@ -124,13 +125,16 @@ def main():
     # Read it in line by line
     # Remove stopwords and punctuation
     # Write some helper functions for each step of training and testing process
+    
     print("Reading stocks...")
     stocks = read_stocks()
     print(stocks.head())
     print("Visualizing stocks...")
     vis_stocks()
-
-    read_articles()
+    if not os.path.exists("all-the-news-2-1-processed.csv"):
+        print('Cleaning articles')
+        read_articles()
+    run_model("all-the-news-2-1-processed.csv", "stocks.csv")
 
 
 if __name__=="__main__":
