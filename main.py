@@ -18,7 +18,7 @@ executor = ProcessPoolExecutor()
 def clean_tokens(text):
     tokens = word_tokenize(text.lower())
     tokens = [re.sub(r'[^\w\s]', '', token) for token in tokens if re.sub(r'[^\w\s]', '', token)]
-    return [token for token in tokens]
+    return tokens
 
 def clean_column(texts):
     return list(executor.map(clean_tokens, texts))
