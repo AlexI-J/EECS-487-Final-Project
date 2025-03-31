@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import nltk
 from nltk.tokenize import word_tokenize
+from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
 import re
 import string
@@ -20,8 +21,16 @@ def clean_tokens(text):
     tokens = [re.sub(r'[^\w\s]', '', token) for token in tokens if re.sub(r'[^\w\s]', '', token)]
     return tokens
 
-def clean_column(texts):
-    return list(executor.map(clean_tokens, texts))
+def clean_article_tokens(article):
+    # Limit article text to its first 4 sentences
+    # (typically includes headline and opening paragraph)
+    return [clean_tokens(sentence) for sentence in sent_tokenize(article)[0:4]]
+
+def clean_titles(titles):
+    return list(executor.map(clean_tokens, titles))
+
+def clean_articles(articles):
+    return list(executor.map(clean_article_tokens, articles))
 
 def read_stocks():
     if os.path.exists("data/stocks.csv"):
@@ -54,8 +63,8 @@ def read_stocks():
                     
                     df = pd.read_csv(file_path, parse_dates=['Date'])
 
-                    df = df[['Date', 'Adj Close']].copy()
-                    df.rename(columns={'Date': 'date', 'Adj Close': 'close'}, inplace=True)
+                    df = df[['Date', 'Open', 'Close']].copy()
+                    df.rename(columns=str.lower, inplace=True)
 
                     mask = (df['date'] >= '2016-01-01') & (df['date'] <= '2020-04-01')
                     df = df.loc[mask]
@@ -66,6 +75,9 @@ def read_stocks():
                     df_list.append(df)
 
         merged_df = pd.concat(df_list, ignore_index=True)
+        # Drop entry from stock CAT, date 2016-01-18
+        # (empty row from original dataset)
+        merged_df = merged_df[merged_df['date'] != "2016-01-18"]
         merged_df.to_csv("data/stocks.csv", index=False)
 
         return merged_df
@@ -98,7 +110,7 @@ def read_articles():
     input_file = "all-the-news-2-1.csv"
     output_file = "data/news.csv"
     chunksize = 10_000
-    cols_to_remove = ['year', 'month', 'day', 'author', 'article', 'url', 'section', 'publication']
+    cols_to_remove = ['year', 'month', 'day', 'author', 'url', 'section', 'publication']
     
     total_lines = 2_688_878
     total_chunks = total_lines // chunksize + 1
@@ -109,7 +121,11 @@ def read_articles():
 
             if 'title' in chunk:
                 chunk['title'] = chunk['title'].fillna("").astype(str)
-                chunk['title'] = clean_column(chunk['title'].values)
+                chunk['title'] = clean_titles(chunk['title'].values)
+
+            if 'article' in chunk:
+                chunk['article'] = chunk['article'].fillna("").astype(str)
+                chunk['article'] = clean_articles(chunk['article'].values)
 
             if 'date' in chunk:
                 chunk['date'] = [pd.to_datetime(datetime_str).date() for datetime_str in chunk['date']]
@@ -118,6 +134,65 @@ def read_articles():
             header = i == 0
             
             chunk.to_csv(output_file, mode=mode, header=header, index=False)
+
+def dates_without_stocks():
+    df = pd.read_csv("data/stocks.csv")
+    # Generate all calendar dates in the stocks dataset range
+    all_dates = pd.date_range(start="2016-01-01", end="2020-04-01", freq='D')
+
+    dates_in_data = pd.to_datetime(df['date'].unique())
+    missing_dates = all_dates.difference(dates_in_data)
+
+    print(f"From a total of {len(all_dates)} dates in the date range of the stocks dataset, {len(missing_dates.tolist())} have no data.")
+
+def dates_with_stocks():
+    df = pd.read_csv("data/stocks.csv")
+    df.drop(['close'], axis=1, inplace=True)
+
+    result = df.groupby(['date', 'category']).count().unstack(level=-1)
+
+    # Find all rows where any value is less than 10
+    filtered = result[(result < 10).any(axis=1)]
+    if filtered.empty:
+        print("Of the dates in the stocks dataset, all of them have values for all stocks.")
+    else:
+        print("WARNING: Of the dates in the stocks dataset, some of them have are missing stock values!")
+
+# load GloVe embeddings
+def load_glove_embeddings(glove_path, embedding_dim=100):
+    print(f"Loading GloVe embeddings")
+    embeddings_index = {}
+    with open(glove_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            values = line.split()
+            word = values[0]
+            coefs = np.asarray(values[1:], dtype='float32')
+            embeddings_index[word] = coefs
+    print(f"Found {len(embeddings_index)} word vectors.")
+    return embeddings_index
+
+# get padded sequences of tokens for each article
+def preprocess_text_data(articles, max_len=100):
+    tokenized_articles = [article.split() for article in articles]
+
+    # crib from homework 3 for this part
+    tokenizer = Tokenizer(oov_token='<UNK>')
+    
+    # process the rest of the articles
+    sequences = tokenizer.texts_to_sequences(tokenized_articles)
+
+    padded_sequences = pad_sequences(sequences, maxlen=max_len, padding='post', truncating='post')
+
+    return padded_sequences, tokenizer
+
+# creates an embedding matrix. also crib from homework 3 for this part
+def create_embedding_matrix(vocabulary, glove_embeddings, embedding_dim=100):
+    embedding_matrix = np.zeros((len(vocabulary) + 1, embedding_dim))
+    for word, i in vocabulary.items():
+        embedding_vector = glove_embeddings.get(word)
+        if embedding_vector is not None:
+            embedding_matrix[i] = embedding_vector
+    return embedding_matrix
 
 def main():
     # TODO: preprocess the dataset
@@ -133,6 +208,11 @@ def main():
     print(stocks.head())
     print("Visualizing stocks...")
     vis_stocks()
+
+    # Analysis of integrity of stock dataset
+    dates_without_stocks()
+    dates_with_stocks()
+
     print("Reading and tokenizing article titles...")
     read_articles()
 
