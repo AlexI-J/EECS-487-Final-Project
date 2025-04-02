@@ -8,6 +8,12 @@ from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pack_padded_sequence, pad_sequence
 from collections import defaultdict
 
+def sen2vec(sentence, embeddings, dim=50):
+    words = sentence.lower().split()
+    vectors = [embeddings[word] for word in words if word in embeddings]
+    if not vectors:
+        return np.zeros(dim)
+    return np.mean(vectors, axis=0)
 
 class NewsDataset(Dataset):
     """Dataset for StockGAP"""
@@ -27,13 +33,13 @@ class NewsDataset(Dataset):
         self.articles = defaultdict(list)
 
         # Use date as key; get dicts with category as key to get list of stock closing prices
-        self.stocks = defaultdict(defaultdict(list))
+        self.stocks = defaultdict(lambda: defaultdict(list))
 
-        for date, title in news_articles.iterrows():
-            self.articles[date].append(title)
+        for row in news_articles.itertuples(index=False):
+            self.articles[row.date].append(row.title)
 
-        for stock, category, date, open, close in stock_closes.iterrows():
-            self.stocks[date][category].append(close - open)
+        for row in stock_closes.itertuples(index=False):
+            self.stocks[row.date][row.category].append(row.close - row.open)
 
         target = datetime.datetime.strptime('2016-01-01', '%Y-%m-%d') + datetime.timedelta(days=date_range)
         final_date = datetime.datetime.strptime('2020-04-01', '%Y-%m-%d')
@@ -44,7 +50,7 @@ class NewsDataset(Dataset):
                 target = target + datetime.timedelta(days=1)
                 continue
 
-            context = [torch.tensor(self.glove[category.lower()])]
+            context = [torch.tensor(self.glove[category])]
 
             # Get news articles for each date
             for i in range(1, date_range):
