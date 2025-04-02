@@ -9,6 +9,7 @@ from nltk.corpus import stopwords
 import re
 from concurrent.futures import ProcessPoolExecutor
 from gensim.scripts.glove2word2vec import glove2word2vec
+from gensim.models import KeyedVectors
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -165,9 +166,11 @@ def read_articles():
                 
                 chunk.to_csv(output_file, mode=mode, header=header, index=False)
     print("News data saved to data/news.csv. Reading data into Python...")
-    return pd.read_csv("data/news.csv")
+    return pd.read_csv("data/news.csv", encoding="utf-8")
 
 def load_word_vectors():
-    glove_input_file = 'glove.6B.50d.txt'
-    word2vec_output_file = 'glove.6B.50d.word2vec.txt'
-    glove2word2vec(glove_input_file, word2vec_output_file)
+    word2vec_output_file = "glove.6B.50d.word2vec.txt"
+    if not os.path.exists("glove.6B.50d.word2vec.txt"):
+        glove_input_file = "glove.6B.50d.txt"
+        glove2word2vec(glove_input_file, word2vec_output_file)
+    return KeyedVectors.load_word2vec_format(word2vec_output_file, binary=False)

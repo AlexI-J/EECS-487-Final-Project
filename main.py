@@ -3,7 +3,6 @@ import os
 from preprocessing import read_stocks, vis_stocks, analyze_stocks, read_articles, load_word_vectors
 from dataset import NewsDataset, sen2vec
 from model import run_model
-from gensim.models import KeyedVectors
 
 def main():
     # TODO: preprocess the dataset
@@ -30,14 +29,13 @@ def main():
     news_articles = read_articles()
 
     print("Loading word vectors...")
-    load_word_vectors()
-    word2vec_output_file = 'glove.6B.50d.word2vec.txt'
-    glove = KeyedVectors.load_word2vec_format(word2vec_output_file, binary=False)
+    glove = load_word_vectors()
     
     print("Loading dataset...")
-    news_data = NewsDataset(stock_closes=stock_closes, news_articles=news_articles, date_range=1, glove=glove, sen2vec=sen2vec)
+    news_data = NewsDataset(stock_closes=stock_closes, news_articles=news_articles, date_range=2, glove=glove, sen2vec=sen2vec)
 
-    print("Done!")
+    print(f"Len of news_data = {len(news_data)}")
+    print(news_data[0])
 
 if __name__=="__main__":
     main()
