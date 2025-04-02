@@ -174,3 +174,6 @@ def load_word_vectors():
         glove_input_file = "glove.6B.50d.txt"
         glove2word2vec(glove_input_file, word2vec_output_file)
     return KeyedVectors.load_word2vec_format(word2vec_output_file, binary=False)
+
+def get_unk_vec(glove):
+    print(glove)

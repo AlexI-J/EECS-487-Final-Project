@@ -1,6 +1,19 @@
 import pandas as pd
 import numpy as np
+import torch
+import torch.nn as nn
 # import other libraries as needed
+
+class LSTM(nn.Module):
+    def __init__(self, embedding_dim, hidden_dim, num_layers=1):
+       super().__init__()
+       self.lstm = nn.LSTM(50, hidden_dim, num_layers, batch_first=True)
+        
+
+    def forward(self, input_ids, seq_lens):
+        output = []
+        
+        return output
 
 def calculate_stock_change(ticker, start, end):
     # calculates the change of a stock from start to end date
