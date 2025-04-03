@@ -5,6 +5,7 @@ stocks.csv
 glove.6B.100d.txt
 glove.6B.50d.txt
 glove.6B.50d.word2vec.txt
+glove.6B.100d.word2vec.txt
 /.venv
 /env
 /__pycache__

@@ -41,6 +41,23 @@ def main():
     (train, val, test) = torch.utils.data.random_split(news_data, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(42))
     train_loader = torch.utils.data.DataLoader(train, batch_size=64, collate_fn=collate_fn, shuffle=True)
 
+    stocks_df = pd.read_csv('data/stocks.csv')
+    news_df = pd.read_csv('data/news.csv')
+
+    # Ensure the 'date' columns are in datetime format
+    stocks_df['date'] = pd.to_datetime(stocks_df['date'])
+    news_df['date'] = pd.to_datetime(news_df['date'])
+
+    # TODO: Make this adjustable via command line arguments
+    category = 'finance'    
+    start_date = '2017-12-18'
+    date_range = 7
+
+    print("Running model...")
+    run_model(category, news_df, stocks_df, 50, start_date, date_range)
+
+    print("Finished tests.")
+
 
 if __name__=="__main__":
     main()
