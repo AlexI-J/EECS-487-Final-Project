@@ -16,20 +16,23 @@ def sen2vec(sentence, embeddings, dim=50):
         return torch.zeros(dim)
     return torch.from_numpy(np.mean(vectors, axis=0))
 
-def collate_fn(batch):
+def lstm_collate_fn(batch):
     """
     Collate function for dataloader
     """
     inputs = {'contexts': [], 'seq_lens': []}
     outputs = []
 
-    inputs['seq_lens'] = torch.tensor([len(entry[0]) for entry in batch])
+    inputs['seq_lens'] = [len(entry[0]) for entry in batch]
+    max_len = max(inputs['seq_lens'])
 
     for entry in batch:
-      inputs['contexts'].append(torch.tensor(entry[0]))
+      while len(entry[0]) < max_len:
+          entry[0].append(torch.zeros(50))
+      inputs['contexts'].append(torch.stack(entry[0]))
       outputs.append(torch.tensor(torch.tensor(entry[1])))
 
-    inputs['contexts'] = pad_sequence(inputs['contexts'], batch_first=True)
+    inputs['contexts'] = torch.stack(inputs['contexts'])
     outputs = torch.tensor(outputs)
 
     return inputs, outputs
@@ -64,7 +67,7 @@ class NewsDataset(Dataset):
         for row in stock_closes.itertuples(index=False):
             self.stocks[row.date][row.category].append(row.close - row.open)
 
-        target = datetime.date(2016, 1, 1) + datetime.timedelta(days=date_range)
+        target = datetime.date(2020, 1, 1) + datetime.timedelta(days=date_range)
         final_date = datetime.date(2020, 4, 1)
         categories = ['industry', 'tech', 'health', 'finance', 'energy']
         while target <= final_date:
@@ -73,20 +76,20 @@ class NewsDataset(Dataset):
                 target = target + datetime.timedelta(days=1)
                 continue
 
-            context = torch.zeros(50)
+            context = []
 
             # Get news articles for each date
             for i in range(1, date_range):
                 day = target - datetime.timedelta(days=i)
                 for title in self.articles[day]:
-                    context = torch.cat((context, sen2vec(title, glove)))
+                    context.append(sen2vec(title, glove))
             
             for category in categories:
                 # We should have all categories for dates that do exist, but check to be sure
                 if category not in self.stocks[target].keys():
                     continue
                 avg_change = sum(self.stocks[target][category]) / len(self.stocks[target][category])
-                category_context = torch.cat((torch.tensor(self.glove[category]), context))
+                category_context = [torch.tensor(self.glove[category])] + context
                 self.data.append((category_context, avg_change))
             
             target = target + datetime.timedelta(days=1)

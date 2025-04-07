@@ -2,7 +2,7 @@ import pandas as pd
 import torch
 import os
 from preprocessing import read_stocks, vis_stocks, analyze_stocks, read_articles, load_word_vectors, get_unk_vec
-from dataset import NewsDataset, sen2vec, collate_fn
+from dataset import NewsDataset, sen2vec, lstm_collate_fn
 from model import run_model
 
 def main():
@@ -39,8 +39,11 @@ def main():
     print(news_data[0])
 
     (train, val, test) = torch.utils.data.random_split(news_data, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(42))
-    train_loader = torch.utils.data.DataLoader(train, batch_size=64, collate_fn=collate_fn, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train, batch_size=16, collate_fn=lstm_collate_fn, shuffle=True)
+    val_loader = torch.utils.data.DataLoader(val, batch_size=64, collate_fn=lstm_collate_fn, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test, batch_size=64, collate_fn=lstm_collate_fn, shuffle=False)
 
+    print()
 
 if __name__=="__main__":
     main()
