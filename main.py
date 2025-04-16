@@ -1,16 +1,10 @@
 import pandas as pd
 import torch
 import os
-from preprocessing import read_stocks, vis_stocks, analyze_stocks, read_articles, load_word_vectors, get_unk_vec
-from dataset import NewsDataset, sen2vec, collate_fn
-from model import run_model
+from preprocessing import read_stocks, vis_stocks, analyze_stocks, read_articles, get_news_windows
+from model import load_data, get_stats, StockGAP
 
 def main():
-    # TODO: preprocess the dataset
-    # Read it in line by line
-    # Remove stopwords and punctuation
-    # Write some helper functions for each step of training and testing process
-
     if not os.path.exists("data"):
         os.mkdir("data")
 
@@ -20,41 +14,32 @@ def main():
 
     print(next(stock_closes.iterrows())[0])
 
-    print("Visualizing stocks...")
-    #vis_stocks()
-
     # Analysis of integrity of stock dataset
-    analyze_stocks()
+    #analyze_stocks()
 
     print("Loading and tokenizing article text...")
     news_articles = read_articles()
-
-    print("Loading word vectors...")
-    glove = load_word_vectors()
-    unk = get_unk_vec(glove)
     
-    print("Loading dataset...")
-    news_data = NewsDataset(stock_closes=stock_closes, news_articles=news_articles, date_range=2, glove=glove, sen2vec=sen2vec)
-    print(f"Len of news_data = {len(news_data)}")
-    print(news_data[0])
+    print("Loading windows...")
+    get_news_windows(7, 30)
 
-    (train, val, test) = torch.utils.data.random_split(news_data, [0.8, 0.1, 0.1], generator=torch.Generator().manual_seed(42))
-    train_loader = torch.utils.data.DataLoader(train, batch_size=64, collate_fn=collate_fn, shuffle=True)
-
-    stocks_df = pd.read_csv('data/stocks.csv')
-    news_df = pd.read_csv('data/news.csv')
-
-    # Ensure the 'date' columns are in datetime format
-    stocks_df['date'] = pd.to_datetime(stocks_df['date'])
-    news_df['date'] = pd.to_datetime(news_df['date'])
-
-    # TODO: Make this adjustable via command line arguments
-    category = 'finance'    
-    start_date = '2017-12-18'
-    date_range = 7
-
-    print("Running model...")
-    run_model(category, news_df, stocks_df, 50, start_date, date_range)
+    print("Loading and splitting data...")
+    train, test = load_data()
+    get_stats(train)
+    
+    print("Creating model...")
+    ffnn = StockGAP('tfidf')
+    trn_tfidf = ffnn.fit_tfidf(train)
+    print(trn_tfidf.shape)
+    trn_tfidf.toarray()
+    
+    print("Finding hyperparameters...")
+    hyperparam = ffnn.cross_validation(trn_tfidf, train.delta)
+    print(hyperparam)
+    ffnn.fit(trn_tfidf, train.delta, hyperparam)
+    ffnn.clf
+    print("Testing model...")
+    print(f"(accuracy, macro F1 score) on the test set is {ffnn.test_performance(test)}")
 
     print("Finished tests.")
 

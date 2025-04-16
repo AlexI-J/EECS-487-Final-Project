@@ -10,6 +10,11 @@ import re
 from concurrent.futures import ProcessPoolExecutor
 from gensim.scripts.glove2word2vec import glove2word2vec
 from gensim.models import KeyedVectors
+import torch
+import csv
+from datetime import timedelta
+import ast
+import random
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -168,12 +173,80 @@ def read_articles():
     print("News data saved to data/news.csv. Reading data into Python...")
     return pd.read_csv("data/news.csv", encoding="utf-8")
 
-def load_word_vectors():
-    word2vec_output_file = "glove.6B.50d.word2vec.txt"
-    if not os.path.exists("glove.6B.50d.word2vec.txt"):
-        glove_input_file = "glove.6B.50d.txt"
-        glove2word2vec(glove_input_file, word2vec_output_file)
-    return KeyedVectors.load_word2vec_format(word2vec_output_file, binary=False)
+def load_embeddings():
+    embeddings = {}
+    
+    with open('glove.6B.100d.txt', 'r', encoding='utf-8') as f:
+        for line in f:
+            values = line.split()
+            word = values[0]
+            vector = torch.tensor([float(v) for v in values[1:]], dtype=torch.float)
+            embeddings[word] = vector
+    
+    return embeddings
 
 def get_unk_vec(glove):
     print(glove)
+
+def get_news_windows(window_size, num_windows):
+    data = [["headlines", "delta"]]
+    
+    # Load the data
+    news_df = pd.read_csv("data/news.csv", parse_dates=["date"])
+    stocks_df = pd.read_csv("data/stocks.csv", parse_dates=["date"])
+
+    # Sort for safety
+    news_df = news_df.sort_values("date")
+    stocks_df = stocks_df.sort_values("date")
+
+    # Set window size
+    window_days = window_size
+
+    # Date range
+    start_date = news_df["date"].min()
+    end_date = news_df["date"].max()
+    count = 0
+
+    latest_start = end_date - timedelta(days=window_days)
+    start_date = start_date + timedelta(
+        days=random.randint(0, (latest_start - start_date).days)
+    )
+
+    current_date = start_date
+    while current_date + timedelta(days=window_days) <= end_date and count != num_windows:
+        window_start = current_date
+        window_end = current_date + timedelta(days=window_days)
+
+        headlines_df = news_df[(news_df["date"] >= window_start) & (news_df["date"] < window_end)]
+        words = headlines_df["title"].dropna().tolist()
+        flattened = []
+        for title in words:
+            flattened = flattened + ast.literal_eval(title)
+
+        window_stocks = stocks_df[(stocks_df["date"] >= window_start) & (stocks_df["date"] <= window_end)]
+        changes = []
+        for ticker in window_stocks["stock"].unique():
+            ticker_data = window_stocks[window_stocks["stock"] == ticker].sort_values("date")
+            if not ticker_data.empty:
+                start_open = ticker_data.iloc[0]["open"]
+                end_close = ticker_data.iloc[-1]["close"]
+                changes.append(end_close - start_open)
+
+        avg_change = sum(changes) / len(changes) if changes else 0
+        delta = "FLAT"
+
+        if avg_change < 0:
+            delta = "LOSS"
+        if avg_change > 0:
+            delta = "GAIN"
+
+        data.append([flattened, delta])
+
+        current_date += timedelta(days=1)
+        count += 1
+        print(f"Windows created: {count}")
+
+    
+    with open("data/final.csv", mode="w", newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
