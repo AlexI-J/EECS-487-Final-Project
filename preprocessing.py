@@ -250,3 +250,5 @@ def get_news_windows(window_size, num_windows):
     with open("data/final.csv", mode="w", newline='') as file:
         writer = csv.writer(file)
         writer.writerows(data)
+
+    return start_date
