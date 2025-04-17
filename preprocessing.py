@@ -206,10 +206,10 @@ def get_news_windows(window_size, num_windows):
     start_date = news_df["date"].min()
     end_date = news_df["date"].max()
     count = 0
-
-    latest_start = end_date - timedelta(days=window_days)
+    
+    latest_start = end_date - timedelta(days=num_windows * window_days)
     start_date = start_date + timedelta(
-        days=random.randint(0, (latest_start - start_date).days)
+        days=random.randint(0, max(0, (latest_start - start_date).days))
     )
 
     current_date = start_date

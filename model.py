@@ -100,3 +100,12 @@ class StockGAP():
         accuracy = accuracy_score(y, prediction)
         f1 = f1_score(y, prediction, average="macro")
         return accuracy, f1
+    
+    def save_vectorizer(self, filename):
+        if hasattr(self, 'vectorizer'):
+            with open(filename, 'wb') as f:
+                pickle.dump(self.vectorizer, f)
+
+    def load_vectorizer(self, filename):
+        with open(filename, 'rb') as f:
+            self.vectorizer = pickle.load(f)
